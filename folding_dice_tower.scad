@@ -24,6 +24,9 @@
 
 include <hinge.scad>;
 
+printPart1 = false;
+printPart2 = true;
+
 $fn = 32;
 tolerance = 0.50;
 pieces = 10;
@@ -116,7 +119,17 @@ module flap(position, isNegative) {
   }
 }
 
-doubleHinges = [1, 2, 4, 5];
+doubleHinges = concat(
+(
+  printPart1
+  ? [1, 2]
+  : []
+), (
+  printPart2
+  ? [4, 5]
+  : []
+)
+);
 
 function sumY(i) = sumSlice(sliceColumn(panels + panelTolerances, 1), 0, i);
 
@@ -137,7 +150,7 @@ flapPositions = [
 ];
 
 // Hinges aligned to Y.
-positions2 = [
+insetHingesY = [
   // Bottom flap
   [backPanelSize[0] + tolerance / 2, (backPanelSize[1] - flapWidth) / 2  + sumY(1), 0],
   // Top flap
@@ -155,6 +168,10 @@ positions2 = [
     0
   ],
 ];
+positions2 = concat(
+  (printPart1 ? [insetHingesY[0], insetHingesY[1]] : []),
+  (printPart2 ? [insetHingesY[2]] : [])
+); 
 rotations2 = [for (i = positions2) 90];
 
 smallHinge = 3;
@@ -165,22 +182,28 @@ flapHingeHoles = [
 ];
 
 module layPanels() { 
+  firstFlap = printPart1 ? 0 : len(flapPositions) - 1;
+  lastFlap = printPart2 ? len(flapPositions) - 1 : 0;
+  firstPanel = printPart1 ? 0 : 3;
+  lastPanel = printPart2 ? len(panels) - 1 : 2;
   difference() {
-    for (i = [0 : len(panels) - 1]) {
+    for (i = [firstPanel : lastPanel]) {
       translate([0, sumY(i), 0])
       cube(panels[i]);
     }
-    for (i = [0 : len(flapPositions) - 1]) {
+    for (i = [firstFlap : lastFlap]) {
       flap(flapPositions[i], true);
     }
   }
-  for (i = [0 : len(flapPositions) - 1]) {
+  for (i = [firstFlap : lastFlap]) {
     flap(flapPositions[i], false);
   }
 
   // Ramp
-  translate([backPanelSize[0] + tolerance, sumY(1) + (boxWidth - flapWidth) / 2, 0])
-  cube(backPanelRamp);
+  if (printPart1) {
+    translate([backPanelSize[0] + tolerance, sumY(1) + (boxWidth - flapWidth) / 2, 0])
+    cube(backPanelRamp);
+  }
 }
 
 difference() {
@@ -220,33 +243,45 @@ difference() {
         flapAngle + 90)
   layPanels();
 
-  translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2, 0])
-  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, true, tolerance);
-  translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2 + sumY(smallHinge), 0])
-  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, true, tolerance);
+  if (printPart1) {
+    translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2, 0])
+    hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, true, tolerance);
+  }
+  if (printPart2) {
+    translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2 + sumY(smallHinge), 0])
+    hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, true, tolerance);
+  }
 
-  translate([
-    (backPanelSize[0] - hingeLength) / 2,
-    sumY(len(panels)) - tolerance/2,
-    0])
-  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, true, tolerance);
+  if (printPart2) {
+    translate([
+      (backPanelSize[0] - hingeLength) / 2,
+      sumY(len(panels)) - tolerance/2,
+      0])
+    hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, true, tolerance);
+  }
+  if (printPart1) {
+    translate([
+      (backPanelSize[0] - hingeLength) / 2,
+      sumY(smallHinge) - tolerance/2,
+      0])
+    hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, true, tolerance);
+  }
+}
+if (printPart1) {
+  translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2, 0])
+  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, false, tolerance);
   translate([
     (backPanelSize[0] - hingeLength) / 2,
     sumY(smallHinge) - tolerance/2,
     0])
-  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, true, tolerance);
+  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, false, tolerance);
 }
-translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2, 0])
-hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, false, tolerance);
-translate([
-  (backPanelSize[0] - hingeLength) / 2,
-  sumY(len(panels)) - tolerance/2,
-  0])
-hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, false, tolerance);
-translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2 + sumY(smallHinge), 0])
-hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, false, tolerance);
-translate([
-  (backPanelSize[0] - hingeLength) / 2,
-  sumY(smallHinge) - tolerance/2,
-  0])
-hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, false, tolerance);
+if (printPart2) {
+  translate([
+    (backPanelSize[0] - hingeLength) / 2,
+    sumY(len(panels)) - tolerance/2,
+    0])
+  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, false, false, tolerance);
+  translate([(backPanelSize[0] - hingeLength) / 2, -tolerance / 2 + sumY(smallHinge), 0])
+  hingeCorner(hingeRadius, thick, hingeLength, sidePieces, true, false, tolerance);
+}
